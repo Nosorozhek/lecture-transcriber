@@ -8,9 +8,11 @@ ENV HF_HOME=/runpod-volume/huggingface_cache
 ENV PYTHONPATH=$PYTHONPATH:/workspace
 
 COPY requirements.txt .
-RUN pip install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install runpod
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --ignore-installed \
+    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 && \
+    pip install --no-cache-dir --ignore-installed -r requirements.txt
+RUN pip install --no-cache-dir runpod
 
 COPY src /workspace/src
 COPY handler.py .
