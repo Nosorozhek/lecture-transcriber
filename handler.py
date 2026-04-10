@@ -10,13 +10,19 @@ os.environ["HF_HOME"] = "/runpod-volume/huggingface_cache"
 
 USERNAME="Nosorozhek"
 
-MODELS = load_models(
-    whisper_model_size="medium",
-    t5_model_path=f"{USERNAME}/rut5-cleaner-tuned",
-    e5_linker_path=f"{USERNAME}/e5-linker-tuned",
-    vlm_model_name="Qwen/Qwen2-VL-7B-Instruct",
-    hf_token=os.getenv("HF_TOKEN"),
-)
+MODELS = None
+
+def get_models():
+    global MODELS
+    if MODELS is None:
+        MODELS = load_models(
+            whisper_model_size="medium",
+            t5_model_path=f"{USERNAME}/rut5-cleaner-tuned",
+            e5_linker_path=f"{USERNAME}/e5-linker-tuned",
+            vlm_model_name="Qwen/Qwen2-VL-7B-Instruct",
+            hf_token=os.getenv("HF_TOKEN"),
+        )
+    return MODELS
 
 def handler(job) -> Iterator[dict]:
     """
