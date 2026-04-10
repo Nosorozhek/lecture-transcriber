@@ -9,10 +9,8 @@ ENV PYTHONPATH=$PYTHONPATH:/workspace
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --ignore-installed \
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 && \
-    pip install --no-cache-dir --ignore-installed -r requirements.txt
-RUN pip install --no-cache-dir runpod
+    pip install --no-cache-dir --ignore-installed -r requirements.txt && \
+    pip install --no-cache-dir runpod
 
 COPY src /workspace/src
 COPY handler.py .
