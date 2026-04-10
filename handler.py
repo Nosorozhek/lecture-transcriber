@@ -18,7 +18,7 @@ def get_models():
         return MODELS
     
     if not os.path.exists("/runpod-volume"):
-        raise Exception("CRITICAL: /runpod-volume not found!")
+        raise Exception("Error: /runpod-volume not found!")
 
     from src.inference_pipeline import load_models
     MODELS = load_models(
@@ -44,7 +44,7 @@ def handler(job) -> Iterator[dict]:
     chunk_threshold = job_input.get("chunk_threshold_chars", 600)
 
     if not audio_path or not os.path.exists(audio_path):
-        yield {"error": f"Audio path {audio_path} not found"}
+        yield {"event_type": "Error", "message":  f"Audio path {audio_path} not found"}
         return
 
     try:
@@ -62,7 +62,7 @@ def handler(job) -> Iterator[dict]:
                     event_dict["materials"] = [m.__dict__ for m in event.materials]
                 yield event_dict
             else:
-                yield {"event_type": "Unknown", "data": str(event)}
+                yield {"event_type": "Error", "data": str(event)}
                 
     except Exception as e:
         yield {"event_type": "Error", "message": str(e)}
