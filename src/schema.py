@@ -7,6 +7,7 @@ class ParsedMaterial:
     content: str
     type: Literal["slide", "code"]
     source_file: str
+    image_base64: Optional[str] = None
 
 @dataclass
 class ModelRegistry:

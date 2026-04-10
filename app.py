@@ -1,6 +1,7 @@
-import streamlit as st
-import tempfile
 import os
+import base64
+import tempfile
+import streamlit as st
 
 from src.schema import (
     StatusEvent, MaterialsReadyEvent, RawSpeechEvent, 
@@ -43,15 +44,50 @@ st.markdown("---")
 
 feed_container = st.container()
 
-def render_artifact(material_id: str):
+def detect_language(source_file: str) -> str:
+    if not source_file:
+        return "text"
+
+    ext = source_file.split(".")[-1].lower()
+
+    mapping = {
+        "py": "python",
+        "rs": "rust",
+        "cpp": "cpp",
+        "hpp": "cpp",
+        "c": "c",
+        "h": "c",
+        "cu": "cuda",
+        "cuh": "cuda",
+        "java": "java",
+        "md": "markdown",
+        "txt": "text",
+        "pdf": "text",
+    }
+
+    return mapping.get(ext, "text")
+
+def render_artifact(material_id: str, container):
     material = st.session_state.materials_db.get(material_id)
     if not material:
-        return "Artifact not found."
+        container.warning("Artifact not found.")
+        return
     
     if material.type == "code":
-        return f"**File:** `{material.source_file}`\n```python\n{material.content}\n```"
+        container.markdown(f"**File:** `{material.source_file}`")
+        lang = detect_language(material.source_file)
+        container.code(material.content, language=lang)
     else:
-        return f"**Slide:** `{material.source_file} ({material.id})`\n\n> *{material.content}*"
+        if material.image_base64:
+            image_bytes = base64.b64decode(material.image_base64)
+            container.image(
+                image_bytes,
+                caption=f"{material.source_file} ({material.id})",
+                width="stretch"
+            )
+
+        expander = container.expander("Show AI Description")
+        expander.markdown(f"> {material.content}")
 
 if start_btn:
     if not audio_file:
@@ -102,16 +138,14 @@ if start_btn:
                     "art": art_slot
                 }
 
-                text_slot.info(f"*(Listening...)*\n\n{event.text}")
+                text_slot.info(f"*Shortening...*\n\n{event.text}")
                 art_slot.caption("Searching for artifacts...")
 
         elif isinstance(event, ProcessedChunkEvent):
             slots = st.session_state.ui_placeholders.get(event.chunk_index)
             if slots:
                 slots["text"].success(event.cleaned_text)
+                art_block = slots["art"].container()
+                art_block.markdown(f"_Confidence Score: {event.similarity_score:.2f}_")
+                render_artifact(event.matched_material_id, art_block)
                 
-                slots["art"].markdown(
-                    render_artifact(event.matched_material_id)
-                )
-                
-                slots["art"].caption(f"Confidence Score: {event.similarity_score:.2f}")

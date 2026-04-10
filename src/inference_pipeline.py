@@ -1,5 +1,6 @@
 import os
 import io
+import base64
 import torch
 from tqdm import tqdm
 from PIL import Image
@@ -47,7 +48,26 @@ def load_models(
     
     return ModelRegistry(whisper_model, t5_tokenizer, t5_model, e5_linker, vlm_model, vlm_processor, device)
 
-def parse_pdf_to_slides_with_vlm(pdf_path: str, vlm_model: Any, vlm_processor: Any) -> Iterator[Union[StatusEvent, ParsedMaterial]]:    
+def get_slide_description_prompt():
+    return f"""### РОЛЬ
+Ты -- лектор в университете на кафедре Computer Science и Machine Learning. 
+Твоя задача: посмотреть на слайд и произнести его вслух так, как это сделал бы живой человек на лекции.
+
+### ИНСТРУКЦИИ
+1. Сделай описание материала со слайда, опираясь НА КАРТИНКУ (графики, схемы).
+2. Если на слайде много информации, в речи оставь произвольную часть, но НЕ МЕНЕЕ половины информации слайда должно быть покрыто.
+3. Описывай код максимально подробно, каждую часть алгоритма.
+4. Ответ должен состоять из 6 ПРЕДЛОЖЕНИЙ.
+
+### ОГРАНИЧЕНИЯ (Negative Constraints)
+- НЕ добавляй вводных фраз ("На слайде написано...", "На слайде обссуждается...").
+- НЕ добавляй примечаний от редактора.
+- НЕ меняй смысл высказывания.
+- НЕ приводи отвлеченных примеров.
+- НЕ заключай ответ в кавычки.
+"""
+
+def parse_pdf_to_slides(pdf_path: str, vlm_model: Any, vlm_processor: Any) -> Iterator[Union[StatusEvent, ParsedMaterial]]:    
     doc = fitz.open(pdf_path)
     total_pages = len(doc)
     filename = os.path.basename(pdf_path)
@@ -61,6 +81,7 @@ def parse_pdf_to_slides_with_vlm(pdf_path: str, vlm_model: Any, vlm_processor: A
 
         pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
         img_data = pix.tobytes("png")
+        img_b64 = base64.b64encode(img_data).decode("utf-8")
         image = Image.open(io.BytesIO(img_data))
         
         messages = [
@@ -73,7 +94,7 @@ def parse_pdf_to_slides_with_vlm(pdf_path: str, vlm_model: Any, vlm_processor: A
                     },
                     {
                         "type": "text", 
-                        "text": "Опиши содержание сайда во всех деталях. Объясни код, формулы, таблицы и схемы. Опиши что изображено на картинках."
+                        "text": get_slide_description_prompt(),
                     },
                 ],
             }
@@ -106,7 +127,8 @@ def parse_pdf_to_slides_with_vlm(pdf_path: str, vlm_model: Any, vlm_processor: A
             id=f"{filename}_Slide_{i+1}", 
             content=vlm_description,
             type="slide",
-            source_file=filename
+            source_file=filename,
+            image_base64=img_b64,
         )
     doc.close()
 
@@ -150,7 +172,7 @@ def parse_materials(file_paths: List[str], vlm_model: Any, vlm_processor: Any) -
     for path in file_paths:
         filename = os.path.basename(path)
         if path.lower().endswith(".pdf"):
-            yield from parse_pdf_to_slides_with_vlm(path, vlm_model, vlm_processor)
+            yield from parse_pdf_to_slides(path, vlm_model, vlm_processor)
             yield StatusEvent(message=f"Finished parsing {filename}", stage="parsing", progress=1.0)
         else:
             yield StatusEvent(message=f"Parsing code file: {filename}...", stage="parsing", progress=0.5)
@@ -319,4 +341,3 @@ def run_lecture_pipeline(
             chunk_index += 1
 
     yield StatusEvent("Lecture processing complete!", "complete")
-    
