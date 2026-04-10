@@ -7,14 +7,13 @@ from src.schema import (
     StatusEvent, MaterialsReadyEvent, RawSpeechEvent, 
     ProcessedChunkEvent, ModelRegistry
 )
-from src.inference_pipeline import load_models, run_lecture_pipeline
 
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY")
 ENDPOINT_ID = os.getenv("ENDPOINT_ID")
 VOLUME_MOUNT_PATH = "/runpod-volume" 
 
 if not RUNPOD_API_KEY or not ENDPOINT_ID:
-    st.error("Internal Error: RUNPOD_API_KEY or ENDPOINT_ID not set.")
+    st.error("Internal Error: RUNPOD_API_KEY or ENDPOINT_ID not set")
     st.stop()
 
 st.set_page_config(page_title="Lecture Transcriber", layout="wide", page_icon="🎓")
