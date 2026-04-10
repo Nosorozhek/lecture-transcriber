@@ -147,6 +147,9 @@ if start_btn:
 
     try:
         for response in endpoint.run(payload):
+            if response.get("event_type") == "Error" or "error" in response:
+                st.error(f"Backend Error: {response.get('message') or response.get('error')}")
+                break
             event = dict_to_event(response)
             if not event: continue
             if isinstance(event, StatusEvent):
