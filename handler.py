@@ -31,6 +31,8 @@ def get_models():
     )
     return MODELS
 
+MODELS = get_models()
+
 def handler(job) -> Iterator[dict]:
     job_input = job["input"]
     audio_path = job_input.get("audio_path")
