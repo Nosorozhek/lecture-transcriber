@@ -1,5 +1,6 @@
 import os
 import io
+import time
 import runpod
 from typing import Iterator, Any
 
@@ -31,13 +32,8 @@ def get_models():
     return MODELS
 
 def handler(job) -> Iterator[dict]:
-    """
-    request scheme is following
-    {
-        "audio_path": "/workspace/my_audio.mp3",
-        "material_paths": ["/workspace/slides.pdf", "/workspace/code.cpp"]
-    }
-    """
+    yield {"event_type": "Error", "message":  f"{job}"}
+    time.sleep()
     job_input = job["input"]
     audio_path = job_input.get("audio_path")
     material_paths = job_input.get("material_paths", [])
