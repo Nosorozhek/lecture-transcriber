@@ -2,6 +2,7 @@ import os
 import base64
 import tempfile
 import streamlit as st
+import runpod
 
 from src.schema import (
     StatusEvent, MaterialsReadyEvent, RawSpeechEvent, 
