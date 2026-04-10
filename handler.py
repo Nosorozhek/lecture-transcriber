@@ -12,9 +12,10 @@ USERNAME="Nosorozhek"
 
 MODELS = load_models(
     whisper_model_size="medium",
-    t5_model_path=f"/runpod-volume/huggingface_cache/models--{USERNAME}--rut5-cleaner-tuned",
-    e5_linker_path=f"/runpod-volume/huggingface_cache/models--{USERNAME}--e5-linker-tuned",
-    vlm_model_name="Qwen/Qwen2-VL-7B-Instruct"
+    t5_model_path=f"{USERNAME}/rut5-cleaner-tuned",
+    e5_linker_path=f"{USERNAME}/e5-linker-tuned",
+    vlm_model_name="Qwen/Qwen2-VL-7B-Instruct",
+    hf_token=os.getenv("HF_TOKEN"),
 )
 
 def handler(job) -> Iterator[dict]:
@@ -44,6 +45,8 @@ def handler(job) -> Iterator[dict]:
             if hasattr(event, "__dict__"):
                 event_dict = event.__dict__.copy()
                 event_dict["event_type"] = event.__class__.__name__
+                if event_dict["event_type"] == "MaterialsReadyEvent":
+                    event_dict["materials"] = [m.__dict__ for m in event.materials]
                 yield event_dict
             else:
                 yield {"event_type": "Unknown", "data": str(event)}

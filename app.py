@@ -9,24 +9,45 @@ from src.schema import (
 )
 from src.inference_pipeline import load_models, run_lecture_pipeline
 
+RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY")
+ENDPOINT_ID = os.getenv("ENDPOINT_ID")
+VOLUME_MOUNT_PATH = "/runpod-volume" 
+
+if not RUNPOD_API_KEY or not ENDPOINT_ID:
+    st.error("Internal Error: RUNPOD_API_KEY or ENDPOINT_ID not set.")
+    st.stop()
+
 st.set_page_config(page_title="Lecture Transcriber", layout="wide", page_icon="🎓")
+
+def dict_to_event(data: dict):
+    etype = data.get("event_type")
+    if etype == "StatusEvent":
+        return StatusEvent(message=data["message"], stage=data["stage"], progress=data.get("progress"))
+    if etype == "MaterialsReadyEvent":
+        mats = [ParsedMaterial(**m) for m in data["materials"]]
+        return MaterialsReadyEvent(materials=mats)
+    if etype == "RawSpeechEvent":
+        return RawSpeechEvent(chunk_index=data["chunk_index"], text=data["text"])
+    if etype == "ProcessedChunkEvent":
+        return ProcessedChunkEvent(
+            chunk_index=data["chunk_index"],
+            cleaned_text=data["cleaned_text"],
+            matched_material_id=data["matched_material_id"],
+            similarity_score=data["similarity_score"]
+        )
+    return None
 
 if "materials_db" not in st.session_state:
     st.session_state.materials_db = {}
 if "ui_placeholders" not in st.session_state:
     st.session_state.ui_placeholders = {}
 
-@st.cache_resource(show_spinner="Loading Models... This might take a few minutes...")
-def get_models() -> ModelRegistry:
-    return load_models()
-
-models = get_models()
 
 with st.sidebar:
     st.markdown("---")
     st.header("📂 Upload Files")
-    audio_file = st.file_uploader("Recording (MP3/WAV)", type=["mp3", "wav", "m4a"])
-    material_files = st.file_uploader("Materials (PDF/Code)", type=["pdf", "rs", "cu", "cuh", "py", "cpp", "c", "java"], accept_multiple_files=True)
+    audio_file = st.file_uploader("Recording (MP3/WAV)", type=["mp3"])
+    material_files = st.file_uploader("Materials (PDF/Code)", accept_multiple_files=True)
     
     start_btn = st.button("🚀 Start Processing", use_container_width=True, type="primary")
 
@@ -94,15 +115,21 @@ if start_btn:
         st.error("Please provide a lecture recording.")
         st.stop()
 
-    temp_dir = tempfile.mkdtemp()
+    runpod.api_key = RUNPOD_API_KEY
+    endpoint = runpod.Endpoint(ENDPOINT_ID)
+
+    import uuid
+    job_id = str(uuid.uuid4())[:8]
+    work_dir = os.path.join(VOLUME_MOUNT_PATH, "jobs", job_id)
+    os.makedirs(work_dir, exist_ok=True)
     
-    audio_path = os.path.join(temp_dir, audio_file.name)
+    audio_path = os.path.join(work_dir, audio_file.name)
     with open(audio_path, "wb") as f:
         f.write(audio_file.read())
         
     mat_paths = []
     for mf in material_files:
-        p = os.path.join(temp_dir, mf.name)
+        p = os.path.join(work_dir, mf.name)
         with open(p, "wb") as f:
             f.write(mf.read())
         mat_paths.append(p)
@@ -110,42 +137,55 @@ if start_btn:
     st.session_state.ui_placeholders.clear()
     st.session_state.materials_db.clear()
 
-    for event in run_lecture_pipeline(audio_path, mat_paths, models):
-        if isinstance(event, StatusEvent):
-            if event.stage == "complete":
-                status_container.success(f"✅ {event.message}")
-                progress_bar.empty()
-            else:
-                status_container.info(f"⏳ **Status:** {event.message}")
-                if event.progress is not None:
-                    progress_bar.progress(event.progress)
-                else:
+    payload = {
+        "input": {
+            "audio_path": audio_path,
+            "material_paths": mat_paths,
+            "chunk_threshold_chars": 600
+        }
+    }
+
+    try:
+        for response in endpoint.run(payload):
+            event = dict_to_event(response)
+            if not event: continue
+            if isinstance(event, StatusEvent):
+                if event.stage == "complete":
+                    status_container.success(f"✅ {event.message}")
                     progress_bar.empty()
+                else:
+                    status_container.info(f"⏳ **Status:** {event.message}")
+                    if event.progress is not None:
+                        progress_bar.progress(event.progress)
+                    else:
+                        progress_bar.empty()
 
-        elif isinstance(event, MaterialsReadyEvent):
-            for m in event.materials:
-                st.session_state.materials_db[m.id] = m
+            elif isinstance(event, MaterialsReadyEvent):
+                for m in event.materials:
+                    st.session_state.materials_db[m.id] = m
 
-        elif isinstance(event, RawSpeechEvent):
-            with feed_container:
-                chunk_row = st.container()
-                col_left, col_right = chunk_row.columns(2)
-                text_slot = col_left.empty()
-                art_slot = col_right.empty()
-                
-                st.session_state.ui_placeholders[event.chunk_index] = {
-                    "text": text_slot,
-                    "art": art_slot
-                }
+            elif isinstance(event, RawSpeechEvent):
+                with feed_container:
+                    chunk_row = st.container()
+                    col_left, col_right = chunk_row.columns(2)
+                    text_slot = col_left.empty()
+                    art_slot = col_right.empty()
+                    
+                    st.session_state.ui_placeholders[event.chunk_index] = {
+                        "text": text_slot,
+                        "art": art_slot
+                    }
 
-                text_slot.info(f"*Shortening...*\n\n{event.text}")
-                art_slot.caption("Searching for artifacts...")
+                    text_slot.info(f"*Shortening...*\n\n{event.text}")
+                    art_slot.caption("Searching for artifacts...")
 
-        elif isinstance(event, ProcessedChunkEvent):
-            slots = st.session_state.ui_placeholders.get(event.chunk_index)
-            if slots:
-                slots["text"].success(event.cleaned_text)
-                art_block = slots["art"].container()
-                art_block.markdown(f"_Confidence Score: {event.similarity_score:.2f}_")
-                render_artifact(event.matched_material_id, art_block)
-                
+            elif isinstance(event, ProcessedChunkEvent):
+                slots = st.session_state.ui_placeholders.get(event.chunk_index)
+                if slots:
+                    slots["text"].success(event.cleaned_text)
+                    art_block = slots["art"].container()
+                    art_block.markdown(f"_Confidence Score: {event.similarity_score:.2f}_")
+                    render_artifact(event.matched_material_id, art_block)
+
+    except Exception as e:
+        st.error(f"Endpoint Error: {e}")  
