@@ -1,5 +1,6 @@
 import os
 import io
+import gc
 import time
 import runpod
 from typing import Iterator, Any
@@ -29,6 +30,7 @@ def get_models():
         vlm_model_name="Qwen/Qwen2-VL-7B-Instruct",
         hf_token=os.getenv("HF_TOKEN")
     )
+    gc.collect()
     return MODELS
 
 MODELS = get_models()

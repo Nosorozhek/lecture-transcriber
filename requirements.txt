@@ -24,6 +24,7 @@ pandas
 scikit-learn
 tqdm
 streamlit
+runpod
 python-dotenv
 
 ipykernel
