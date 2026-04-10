@@ -32,8 +32,6 @@ def get_models():
     return MODELS
 
 def handler(job) -> Iterator[dict]:
-    yield {"event_type": "Error", "message":  f"{job}"}
-    time.sleep()
     job_input = job["input"]
     audio_path = job_input.get("audio_path")
     material_paths = job_input.get("material_paths", [])

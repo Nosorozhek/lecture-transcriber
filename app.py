@@ -3,6 +3,7 @@ import base64
 import tempfile
 import streamlit as st
 import runpod
+import requests
 
 from src.schema import (
     StatusEvent, MaterialsReadyEvent, RawSpeechEvent, 
@@ -138,11 +139,9 @@ if start_btn:
     st.session_state.materials_db.clear()
 
     payload = {
-        "input": {
-            "audio_path": audio_path,
-            "material_paths": mat_paths,
-            "chunk_threshold_chars": 600
-        }
+        "audio_path": audio_path,
+        "material_paths": mat_paths,
+        "chunk_threshold_chars": 600
     }
 
     try:
@@ -191,5 +190,7 @@ if start_btn:
                     art_block.markdown(f"_Confidence Score: {event.similarity_score:.2f}_")
                     render_artifact(event.matched_material_id, art_block)
 
+    except requests.exceptions.HTTPError as err:
+        st.error(f"HTTP 400 Bad Request. \n\nDetails: {err.response.text}")
     except Exception as e:
         st.error(f"Endpoint Error: {e}")  
