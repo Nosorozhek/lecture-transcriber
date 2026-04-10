@@ -146,7 +146,8 @@ if start_btn:
     }
 
     try:
-        for response in endpoint.run(payload):
+        run_req = endpoint.run(payload)
+        for response in run_req.stream():
             if response.get("event_type") == "Error" or "error" in response:
                 st.error(f"Backend Error: {response.get('message') or response.get('error')}")
                 break

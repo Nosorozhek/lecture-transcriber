@@ -14,14 +14,20 @@ MODELS = None
 
 def get_models():
     global MODELS
-    if MODELS is None:
-        MODELS = load_models(
-            whisper_model_size="medium",
-            t5_model_path=f"{USERNAME}/rut5-cleaner-tuned",
-            e5_linker_path=f"{USERNAME}/e5-linker-tuned",
-            vlm_model_name="Qwen/Qwen2-VL-7B-Instruct",
-            hf_token=os.getenv("HF_TOKEN"),
-        )
+    if MODELS is not None:
+        return MODELS
+    
+    if not os.path.exists("/runpod-volume"):
+        raise Exception("CRITICAL: /runpod-volume not found!")
+
+    from src.inference_pipeline import load_models
+    MODELS = load_models(
+        whisper_model_size="medium",
+        t5_model_path="Nosorozhek/rut5-cleaner-tuned",
+        e5_linker_path="Nosorozhek/e5-linker-tuned",
+        vlm_model_name="Qwen/Qwen2-VL-7B-Instruct",
+        hf_token=os.getenv("HF_TOKEN")
+    )
     return MODELS
 
 def handler(job) -> Iterator[dict]:
@@ -42,6 +48,7 @@ def handler(job) -> Iterator[dict]:
         return
 
     try:
+        MODELS = get_models()
         for event in run_lecture_pipeline(
             audio_path=audio_path,
             material_paths=material_paths,
