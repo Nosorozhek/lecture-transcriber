@@ -7,7 +7,6 @@ from src.schema import (
     StatusEvent, MaterialsReadyEvent, RawSpeechEvent, 
     ProcessedChunkEvent, ModelRegistry
 )
-from src.inference_pipeline import load_models, run_lecture_pipeline
 
 os.environ["HF_HOME"] = "/workspace/huggingface_cache"
 
@@ -20,6 +19,7 @@ if "ui_placeholders" not in st.session_state:
 
 @st.cache_resource(show_spinner="Loading Models... This might take a few minutes...")
 def get_models() -> ModelRegistry:
+    from src.inference_pipeline import load_models
     return load_models()
 
 models = get_models()
@@ -112,6 +112,7 @@ if start_btn:
     st.session_state.ui_placeholders.clear()
     st.session_state.materials_db.clear()
 
+    from src.inference_pipeline import run_lecture_pipeline
     for event in run_lecture_pipeline(audio_path, mat_paths, models):
         if isinstance(event, StatusEvent):
             if event.stage == "complete":
