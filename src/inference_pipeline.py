@@ -19,9 +19,9 @@ from src.schema import *
 
 @lru_cache(maxsize=1)
 def load_models(
-    whisper_model_size: str = "medium",
-    t5_model_path: str = "models/rut5-cleaner-tuned/",
-    e5_linker_path: str = "models/e5-linker-tuned/",
+    whisper_model_size: str = "large-v3",
+    t5_model_path: str = "Nosorozhek/rut5-cleaner-tuned",
+    e5_linker_path: str = "Nosorozhek/e5-linker-tuned",
     vlm_model_name: str = "Qwen/Qwen2-VL-7B-Instruct",
     hf_token: str | None = None
 ) -> ModelRegistry:
